@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>הרשומה הסיעודית</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #4f46e5;
+      --accent2: #818cf8;
+      --soft: #eef2ff;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+    }
+    body { font-family: 'Assistant', sans-serif; background: #f1f5f9; color: #1e293b; }
+    .module-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 2rem;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05);
+      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Top progress */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+      background: rgba(241,245,249,0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(226,232,240,0.8);
+    }
+    .progress-bar { height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.4s ease;
+    }
+    .progress-ring {
+      width: 44px; height: 44px;
+      display: grid; place-items: center;
+      border-radius: 999px;
+      background: white;
+      border: 1px solid rgba(226,232,240,0.9);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.06);
+    }
+    .ring-text {
+      font-size: 11px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: sticky;
+      top: 84px;
+      height: calc(100vh - 84px);
+      overflow: auto;
+      border-radius: 1.5rem;
+      border: 1px solid rgba(226,232,240,0.9);
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(10px);
+    }
+    .side-item {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.75rem 0.9rem;
+      border-radius: 1rem;
+      transition: transform 0.15s ease, background 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .side-item:hover { background: rgba(226,232,240,0.5); transform: translateY(-1px); }
+    .side-item.active {
+      background: var(--soft);
+      border-color: rgba(0,0,0,0.05);
+    }
+    .side-icon {
+      width: 36px; height: 36px;
+      display: grid; place-items: center;
+      border-radius: 12px;
+      background: var(--soft);
+      border: 1px solid rgba(0,0,0,0.04);
+    }
+    .side-title {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    .side-sub {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 0.1rem;
+    }
+    .accent-pill {
+      width: 10px; height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+
+    /* Existing interactive components */
+    .flashcard { perspective: 1000px; height: 200px; cursor: pointer; }
+    .flashcard-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+    .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+    .flashcard-front, .flashcard-back {
+      position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
+      display: flex; align-items: center; justify-content: center;
+      padding: 2rem; border-radius: 1.5rem; text-align: center;
+    }
+    .flashcard-front { background: #f8fafc; border: 2px solid #e2e8f0; font-weight: bold; }
+    .flashcard-back { background: var(--accent); color: white; transform: rotateY(180deg); }
+
+    .step-bubble {
+      width: 40px; height: 40px; background: var(--accent); color: white;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; margin-bottom: 1rem;
+    }
+
+    .option-btn { transition: all 0.2s; border: 2px solid #e2e8f0; }
+    .option-btn:hover { border-color: var(--accent); background: var(--soft); }
+    .option-btn.correct { background: #dcfce7 !important; border-color: #22c55e !important; }
+    .option-btn.wrong { background: #fee2e2 !important; border-color: #ef4444 !important; }
+
+    .btn-primary {
+      background: var(--accent);
+    }
+    .btn-primary:hover {
+      filter: brightness(0.95);
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+
+  <!-- Fixed top bar: logo + circular progress + linear progress -->
+  <div class="topbar">
+    <div class="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center gap-3">
+      <!-- Logo (replace src with the hospital logo file / URL) -->
+      <div class="flex items-center gap-3">
+        <img id="hospitalLogo" src="data:image/png;base64,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" alt="לוגו " class="h-14 w-auto max-w-[260px] rounded-lg bg-white object-contain border border-slate-200 px-2 py-1" onerror="this.style.display='none'">
+        <div class="hidden sm:block">
+          <div class="text-sm font-extrabold text-slate-900"></div>
+          <div class="text-xs text-slate-500"></div>
+        </div>
+      </div>
+
+      <div class="flex-1"></div>
+
+      <!-- Circular progress -->
+      <div class="progress-ring" title="התקדמות בלומדה">
+        <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true">
+          <path d="M18 2.5 a 15.5 15.5 0 1 1 0 31 a 15.5 15.5 0 1 1 0 -31" fill="none" stroke="#e2e8f0" stroke-width="3.5" />
+          <path id="progressCircle" d="M18 2.5 a 15.5 15.5 0 1 1 0 31 a 15.5 15.5 0 1 1 0 -31" fill="none" stroke="var(--accent)" stroke-linecap="round" stroke-width="3.5" stroke-dasharray="0 100" />
+        </svg>
+        <div id="progressPct" class="ring-text -mt-10">0%</div>
+      </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 md:px-6 pb-3">
+      <div class="progress-bar">
+        <div id="progressBar" class="progress-fill" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shell -->
+  <div class="max-w-6xl mx-auto mt-[92px]">
+    <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
+      <!-- Sidebar (units + icons) -->
+      <aside class="sidebar p-3 hidden lg:block" aria-label="ניווט יחידות">
+        <div class="px-2 pb-3 pt-1 flex items-center justify-between">
+          <div class="font-black text-slate-900">יחידות</div>
+          <div class="text-xs text-slate-500">לחיצה לקפיצה</div>
+        </div>
+        <div id="sidebarList" class="space-y-2"></div>
+      </aside>
+
+      <!-- Main -->
+      <main>
+        <div id="app" class="max-w-3xl mx-auto">
+          <!-- Screens will be injected here -->
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const moduleData = {"title":"הרשומה הסיעודית","intro":{"title":"ברוכים הבאים ללומדת \"הרשומה הסיעודית\"!","text":"בלומדה זו נעמיק במשמעותה של הרשומה הסיעודית ככלי קליני ומשפטי מרכזי. נכיר את עקרונות הכתיבה המקצועית, הכללים לתיעוד מדויק ואובייקטיבי, ואת ההיבטים המשפטיים של הרשומה.","btn":"מתחילים ללמוד"},"outro":{"title":"כל הכבוד! סיימתם את הלומדה.","text":"כעת אתם מכירים את העקרונות המרכזיים של הרשומה הסיעודית. זכרו: \"מה שלא תועד – לא נעשה\". הקפדה על רשומה איכותית היא הבסיס לטיפול רפואי בטוח ומקצועי.","btn":"סיום הלומדה"},"units":[{"title":"ההיבט המשפטי של הרשומה הסיעודית","desc":"הכרת המסגרת החוקית, חוק זכויות החולה ועקרון \"הנזק הראייתי\" בתיעוד הסיעודי","subUnits":[{"title":"הרשומה כראיה משפטית","type":"text","content":"הרשומה הסיעודית היא חלק בלתי נפרד מהרשומה הרפואית ומהווה מסמך קליני-משפטי מחייב. היא משמשת כראיה מרכזית בהליכים משפטיים, משמעתיים או בוועדות בדיקה. \nזכרו: חלה עליכם חובה מקצועית לתיעוד מלא, אובייקטיבי ובזמן אמת.","actType":"tf","actQ":"במקרה של תביעה משפטית, אם פעולה סיעודית בוצעה אך לא תועדה ברשומה, נטל ההוכחה שהפעולה אכן בוצעה מוטל על המוסד הרפואי או על איש הצוות","actData":"","actOpts":[],"actAns":"true"},{"title":"המסגרת החוקית","type":"flashcards","content":"חובת ניהול רשומה | על פי סעיף 17 לחוק זכויות החולה, כל מטפל מחויב לתעד את מהלך הטיפול, האבחנות וההוראות. אי תיעוד נחשב כהפרת חובה חוקית.\nזכות לעיון | סעיף 18 קובע כי למטופל זכות לעיין ברשומה ולקבל העתק. לכן התיעוד חייב להיות ענייני, מכבד וללא ביטויים שיפוטיים.\nסודיות רפואית | סעיף 19 מחייב שמירה על סודיות המידע הרפואי. אין להעביר מידע לגורם שאינו מעורב בטיפול ללא הסכמה או צו שיפוטי.\nחוק טיפול בחולי נפש | הרשומה משמשת בסיס להחלטות קריטיות כגון אשפוז כפוי, בדיקה פסיכיאטרית ונקיטת אמצעי הגבלה.","actType":"mcq","actQ":"על פי סעיף 17 לחוק זכויות החולה, מהי המשמעות של הימנעות מתיעוד מהלך הטיפול?","actData":"","actOpts":["אי תיעוד נחשב כהפרת חובה חוקית ועלול להתפרש כהתרשלות מקצועית.","מדובר בהמלצה מקצועית בלבד ואינה מהווה עבירה על החוק.","חובת התיעוד חלה רק במקרים של טיפולים פולשניים או ניתוחים.","אי תיעוד מותר במידה והצוות היה תחת עומס עבודה חריג."],"actAns":""},{"title":"עקרונות מחייבים בתיעוד","type":"list","content":"דוקטרינת הנזק הראייתי: פעולה שלא תועדה – תיחשב כאילו לא בוצעה.\nתיעוד בזמן אמת: יש לבצע את התיעוד סמוך ככל האפשר לאירוע.\nדיוק ואובייקטיביות: תיאור עובדות נצפות בלבד (לדוגמה: \"המטופל צעק\" במקום \"המטופל אלים\").\nאיסור מחיקה: אין להשתמש בטיפקס או למחוק מידע בתיעוד ידני.","actType":"tf","actQ":"לפי דוקטרינת הנזק הראייתי, אם פעולה לא תועדה, נטל ההוכחה שהיא בוצעה עובר אל איש הצוות","actData":"","actOpts":[],"actAns":"true"},{"title":"במערכת הפסיכיאטרית, נקיטת אמצעים כמו הגבלה מכנית, בידוד או השגחה מיוחדת מהווה פגיעה משמעותית באוטונומיה של המטופל. לכן, קיימת חובה לתיעוד קפדני הכולל את המרכיבים הבאים","type":"list","content":"הנמקה מקצועית: הסבר מפורט מדוע הוחלט על נקיטת האמצעי.\nתיאור מצב המטופל: פירוט מצבו הקליני וההתנהגותי של המטופל טרם הפעלת האמצעי.\nפירוט התערבויות קודמות: תיאור הניסיונות וההתערבויות שבוצעו כדי למנוע את הצורך בהגבלה.\nמעקב שוטף: תיעוד המעקב והבדיקות בזמן השימוש באמצעי, בהתאם לנהלים המחמירים.\nהערכה מחודשת: תיעוד ניסיונות לשחרור המטופל מההגבלה והערכות מצב תקופתיות.\nזכרו: אי תיעוד מספק במצבים אלו עלול להיחשב כרשלנות חמורה בביקורת ובבית המשפט.","actType":"mcq","actQ":"בעת תיעוד של הגבלה מכנית (קשירה) במחלקה פסיכיאטרית, מה מחויב איש הצוות לציין בנוסף להחלטה עצמה?","actData":"","actOpts":["פירוט ההתערבויות שבוצעו טרם ההחלטה ותיאור ניסיונות לשחרור מההגבלה","רק את שעת תחילת ההגבלה ושעת הסיום המשוערת.","אין צורך בפירוט נוסף אם קיימת הוראה חתומה על ידי רופא.","תיאור קצר של מצב המטופל בסיום המשמרת בלבד."],"actAns":""},{"title":"דיווח על אירועים חריגים","type":"text","content":"בהתאם לנהלי משרד הבריאות, קיימת חובה לדווח ולתעד אירועים חריגים , אי דיווח מהווה הפרה מקצועית ועלול לגרור אחריות משמעתית","actType":"tf","actQ":"בתיעוד של נקיטת אמצעי הגבלה מכנית (כמו קשירה), מספיק לציין את סוג ההגבלה ואת שעת ההתחלה, ואין חובה לתעד את הניסיונות שנעשו כדי למנוע את ההגבלה טרם הפעלתה","actData":"","actOpts":[],"actAns":"false"}]},{"title":"מודלים מרכזיים לדיווח סיעודי","desc":"הכרת מודלים מובנים (SOAP, DAR, PIE) לארגון מידע קליני בצורה שיטתית, בהירה ואחידה התורמת לרצף הטיפולי ולהגנה משפטית.","subUnits":[{"title":"מודל SOAP","type":"flashcards","content":"S – Subjective (סובייקטיבי) | דברי המטופל כפי שנמסרו על ידו (תחושות, תלונות, ציטוטים). דוגמה: \"השכנים משתילים לי מחשבות\".\nO – Objective (אובייקטיבי) | ממצאים נצפים ומדידים (סימנים חיוניים, סטטוס פסיכיאטרי, התנהגות). דוגמה: נראה מתוח, אי שקט פסיכומוטורי.\nA – Assessment (הערכה) | ניתוח מקצועי המבוסס על הנתונים שנאספו. דוגמה: החמרה במצב פסיכוטי עם מחשבות שווא.\nP – Plan (תוכנית טיפולית) | הצעדים שהוחלט עליהם לאחר ההערכה. דוגמה: התחלת טיפול אנטי-פסיכוטי והשגחה.\nמתי להשתמש? | מתאים במיוחד לקבלת מטופל, הערכה מחודשת וסיכום מצב מורכב.","actType":"tf","actQ":"מותר ומומלץ להוסיף לדיווח הסיעודי הערות אישיות ומחמיאות על המטופל, כמו למשל: 'המטופל חמוד מאוד, אהבתי אותו', כדי להראות שהקשר הטיפולי היה מוצלח","actData":"","actOpts":[],"actAns":"false"},{"title":"מודל DAR ","type":"steps","content":"שלב 1: D – Data (נתונים) | איסוף נתונים סובייקטיביים ואובייקטיביים הקשורים לבעיה או לאירוע הספציפי.\nשלב 2: A – Action (פעולה) | תיאור ההתערבות הסיעודית או הטיפול שבוצע בפועל (למשל מתן תרופת SOS או הרגעה).\nשלב 3: R – Response (תגובה) | תיעוד תגובת המטופל להתערבות ובחינה האם הושגה הקלה במצבו. \nשלב 4: מתי להשתמש? | אירועים חריגים, התקפי חרדה, שינוי חד במצב הקליני או מתן טיפול SOS.","actType":"tf","actQ":"חל איסור מוחלט לציין בדיווח הסיעודי כי בוצעה התייעצות עם רופא או כי התקבלו הנחיות טלפוניות מרופא","actData":"","actOpts":[],"actAns":"false"},{"title":"מודל PIE","type":"list","content":"P – Problem (בעיה): הגדרה ממוקדת של הבעיה הסיעודית (למשל: חוסר היגיינה על רקע תסמינים שליליים).\nI – Intervention (התערבות): הפעולות שננקטו כדי להתמודד עם הבעיה (למשל: ליווי יזום למקלחת).\nE – Evaluation (הערכה): בחינת תוצאות ההתערבות והמשך המעקב הנדרש.\nמתי להשתמש? | מעקב אחר בעיות כרוניות, תהליכים שיקומיים ממושכים ובחינת היענות לטיפול.","actType":"mcq","actQ":"מתי השימוש במודל ה-PIE (בעיה-התערבות-הערכה) הוא המתאים ביותר?","actData":"","actOpts":["במעקב אחר בעיות כרוניות, בחינת היענות לטיפול ובתהליכים שיקומיים מתמשכים.","רק בעת קבלת מטופל חדש למחלקה לצורך הערכה ראשונית.","במקרים של התפרצות התנהגותית פתאומית הדורשת תיעוד SOS מהיר.","לצורך תיעוד סימנים חיוניים בלבד (לחץ דם ודופק) במהלך משמרת רגילה."],"actAns":""}]},{"title":"דיווח סיעודי בעת שחרור מטופל","desc":"למידת עקרונות התיעוד בנקודת המעבר הרגישה שבין האשפוז לקהילה, להבטחת רצף טיפולי, בטיחות המטופל והגנה משפטית.","subUnits":[{"title":"למה ואיך מתעדים שחרור?","type":"text","content":"מטרות הדיווח: הבטחת רצף טיפולי בקהילה, הכנת המטופל ומשפחתו, הפחתת סיכון להחמרה ושמירה על בטיחות.\nעקרונות הכתיבה: כתיבה עניינית, עובדתית (ללא פרשנות), סדר כרונולוגי, תיעוד מפורש של הדרכה ומסירת תרופות/מסמכים, וציון גורם מלווה.\nהיבט משפטי: הדיווח הוא מסמך קליני-משפטי מחייב המשקף את איכות הטיפול שניתן.","actType":"tf","actQ":"בדיווח השחרור מומלץ להוסיף פרשנות אישית של האחות לגבי התנהגות המטופל כדי להעשיר את המידע","actData":"","actOpts":[],"actAns":"false"},{"title":"מה חייב להופיע בדיווח?","type":"flashcards","content":"מצב המטופל | תיעוד מצב נפשי וגופני, רמת התמצאות, שיפוט, תובנה והערכת מסוכנות.\nהדרכה | פירוט למי ניתנה ההדרכה, תוכנה (תרופות, המשך מעקב, סימני אזהרה) והערכת הבנת המטופל.\nתרופות ומסמכים | ציון סוג התרופות שנמסרו ומשך האספקה, ואישור מסירת מכתב שחרור ומרשמים.\nחפצי ערך וליווי | תיעוד השבת חפצי ערך וציון הגורם המלווה ביציאה מן המחלקה.","actType":"mcq","actQ":"מדוע תיעוד \"הערכת הבנת המטופל\" הוא מרכיב קריטי בדיווח השחרור?","actData":"","actOpts":["כדי להבטיח רצף טיפולי בטוח ולוודא שהמטופל מסוגל ליישם את תוכנית הטיפול בקהילה.","כדי להוכיח שהאחות הקדישה זמן רב למטופל לפני צאתו.","כדי שהרופא בקהילה ידע שהמטופל אינו זקוק להסברים נוספים.","אין לכך חשיבות משפטית, זוהי המלצה אתית בלבד"],"actAns":""},{"title":"מבנה מומלץ לדיווח","type":"list","content":"ראשון: מצב המטופל בעת השחרור (נפשי, גופני ומסוכנות).\nשני: פירוט ההדרכה שניתנה והערכת הבנת המטופל.\nשלישי: תיעוד מסירת תרופות, מסמכים והסבר על המשך מעקב.\nרביעי: השבת חפצי ערך, ציון המלווה ואופן היציאה מהמחלקה.","actType":"tf","actQ":"בדיווח סיעודי בעת שחרור מטופל מאשפוז פסיכיאטרי, חובה לכלול הערכת מסוכנות לעצמו או לאחרים (במידת הצורך) כחלק מתיעוד מצב המטופל","actData":"","actOpts":[],"actAns":"true"},{"title":"דוגמה מלאה לדיווח שחרור","type":"text","content":"המטופל משוחרר לביתו. בהכרה מלאה, מתמצא בזמן ובמקום. מצב רוח יציב. ללא מחשבות אובדניות. שיפוט ותובנה תקינים.\nניתנה הדרכה למטופל ולאחותו לגבי המשך טיפול תרופתי, מינונים ותופעות לוואי אפשריות. הוסברו סימנים המחייבים פנייה דחופה למיון. המטופל ואחותו הביעו הבנה.\nהמטופל צויד בתרופות ל־48 שעות בהתאם להנחיית הרופא.\nמכתב שחרור ומרשמים נמסרו לידיו.\nקיבל חפצי הערך שלו ממזכירות המחלקה.\nיצא בליווי אחותו.\n","actType":"reflect","actQ":"כעובד חדש במחלקה, כאשר אתה מתעד שחרור של מטופל לראשונה, מדוע לדעתך חשוב להקפיד על המבנה המובנה (מצב קליני -> הדרכה -> לוגיסטיקה) במקום לכתוב דיווח חופשי? כיצד סדר זה מסייע לך לוודא שלא שכחת אף פרט קריטי לבטיחותו","actData":"","actOpts":[],"actAns":""}]},{"title":"דיווח סיעודי – קבלת מטופל למלר״ד","desc":"למידת עקרונות התיעוד הראשוני במפגש עם המטופל במיון, בדגש על מיון (טריאז'), אומדן מסוכנות","subUnits":[{"title":"למה ואיך כותבים במיון?","type":"text","content":"מטרת הדיווח: תיעוד מצב המטופל בהגעה, שיקוף מיון ראשוני (טריאז') ואומדן מסוכנות, ותיעוד פעולות סיעודיות ותקשורת עם הצוות הרפואי.\nעקרונות מחייבים: כתיבה עניינית, כרונולוגית, אובייקטיבית (ללא פרשנות) ומבוססת עובדות נצפות.\n\nכלל הזהב: מה שלא תועד – לא בוצע!","actType":"tf","actQ":"בדיווח במלר\"ד מותר להשתמש בביטויים כמו 'מטופל מניפולטיבי' או 'עושה הצגות' כדי להזהיר את הצוות הבא.","actData":"","actOpts":[],"actAns":"false"},{"title":"מבנה הדיווח","type":"flashcards","content":"פרטי הגעה | תיעוד שעה, אופן הגעה (מד\"א, משטרה וכו'), מלווים ומקור הפניה.\nהתרשמות והתנהגות | תיאור הופעה חיצונית, קשר עין, שיתוף פעולה, מצב רגשי וסימני אי-שקט.\nאומדן מסוכנות (חובה!) | תיעוד מפורש של מחשבות אובדניות, תכנית/כוונה, ניסיונות עבר ומסוכנות לאחרים.\nאומדן גופני וכאב | מדדים חיוניים, תלונות גופניות ודירוג כאב לפי דיווח המטופל.","actType":"mcq","actQ":"מה נחשב לליקוי מקצועי חמור בדיווח סיעודי במלר\"ד?","actData":"","actOpts":["היעדר תיעוד מפורש של אומדן מסוכנות","תיעוד הגעה ללא ליווי משפחתי.","אי-תיעוד של אומדן כאב בעת הקבלה.","תיעוד עיכוב של פחות מ-20 דקות בטיפול."],"actAns":""},{"title":"חשיבות תיעוד אומדן מסוכנות במלר\"ד","type":"text","content":"הערכת המסוכנות היא המרכיב הקריטי ביותר בדיווח הסיעודי במיון הפסיכיאטרי. תיעוד זה אינו רק פעולה טכנית, אלא כלי מציל חיים והגנה משפטית מהותית עבור הצוות המטפל.\n\nמה חובה לתעד? \nיש לכתוב במפורש את הנתונים הבאים:\n\nמחשבות אובדניות: האם קיימות מחשבות כרגע?\nתכנית וכוונה: האם למטופל יש תכנית קונקרטית או כוונה מיידית לפעול?\nהיסטוריה: האם היו ניסיונות אובדניים בעבר?\nמסוכנות לאחרים: האם קיים חשש לתוקפנות או פגיעה בסביבה?","actType":"reflect","actQ":"\"כעובד חדש, מדוע לדעתך חשוב לתעד במפורש עיכובים בטיפול או את זמן העדכון של הרופא בדיווח במלר\"ד? כיצד תיעוד זה מגן עליך ועל המטופל?\"","actData":"","actOpts":[],"actAns":""}]},{"title":"קבלת מטופל למחלקה פסיכיאטרית","desc":"קבלת מטופל למחלקה היא רגע מכריע ברצף הטיפולי. הדיווח הראשוני הוא מסמך קליני-משפטי מחייב המבטיח את בטיחות המטופל והצוות ומהווה בסיס לכל תוכנית הטיפול בהמשך.","subUnits":[{"title":"מה חייב להופיע בתיעוד הראשוני?","type":"flashcards","content":"פרטי העברה | תיעוד מועד הכניסה למחלקה וסוג האשפוז (בהסכמה או כפוי).\nמצב המטופל | תיאור אובייקטיבי של התנהגות, רמת שיתוף פעולה, חרדה, מצב רגשי והתמצאות.\nאומדן סיכון | תיעוד מפורש של מחשבות אובדניות, תכנית/כוונה, ניסיונות עבר ומסוכנות לאחרים.\nאנמנזה סיעודית | תיעוד אלרגיות, תרופות קבועות, מחלות רקע, שימוש בחומרים ומערך תמיכה.\nמידע למטופל | תיעוד מתן הסבר על זכויות וחובות, נהלי המחלקה והיכרות עם הצוות.","actType":"mcq","actQ":"מהם מרכיבי החובה שיש לתעד בדיווח הסיעודי בעת קבלת מטופל למחלקה הפסיכיאטרית?","actData":"","actOpts":["מועד כניסה וסוג אשפוז, תיאור אובייקטיבי של מצב המטופל והתנהגותו, אומדן סיכון והנחיות בטיחות, אנמנזה סיעודית מלאה ומידע שנמסר למטופל.","רק את שעת ההגעה ואת רשימת חפצי הערך שהופקדו בכספת המחלקה.","תיאור כללי של המטופל (\"חמוד\", \"משתף פעולה\") וסיכום של דברי הרופא במיון בלבד.","רשימת התרופות שהמטופל אמור לקבל במהלך האשפוז ללא צורך בתיעוד מצבו הרגשי או רמת החרדה שלו."],"actAns":""},{"title":"הגוף בתוך האשפוז הפסיכיאטרי","type":"text","content":"הבדיקה הגופנית בקבלה נועדה לשלול מצב רפואי חריף, לזהות חבלות או סימני אלימות, ולספק הגנה משפטית לצוות.\nמדדים חיוניים: חובה לתעד לחץ דם, דופק וחום. סטורציה וסוכר יבוצעו במידת הצורך.\nסקר גוף מפורט: יש לתעד חבלות, חתכים (כולל פגיעה עצמית), סימני קשירה, מצב היגייני וסימני גמילה.\nדגש משפטי בתיעוד פגיעה: בעת זיהוי ממצא חריג, יש לציין מיקום מדויק, גודל, צבע, צורה ומה אמר המטופל על מקור הפגיעה.\nבדיקת חפצים מסוכנים: תיעוד בדיקה לחפצים כגון סכינים, חבלים, מציתים או כדורים.","actType":"tf","actQ":"כאשר המטופל מגיע עם חבלה טרייה, מספיק לכתוב 'קיימת חבלה בפנים' ללא פירוט נוסף","actData":"","actOpts":[],"actAns":"false"},{"title":"תיעוד חפצי ערך ורכוש","type":"steps","content":"רישום מפורט: אין להשתמש בתיאור כללי. יש לפרט במדויק: \"ארנק שחור\", סכום כסף מזומן מדויק, סוג טלפון נייד וצבעו.\nאופן הטיפול: יש לתעד האם החפצים הופקדו בכספת, הועברו למשפחה או נשארו ברשות המטופל.\nחתימה: חובה להחתים את המטופל ואיש צוות (ועד נוסף במידת הצורך) על טופס ההפקדה.","actType":"reflect","actQ":"כשבדקתי ורשמתי את הציוד בצורה מפורטת כל כך, איך זה השפיע על תחושת הביטחון שלי מול המטופל ועל היכולת שלי להגן על עצמי ועל המערכת מפני אי-הבנות בעתיד?","actData":"","actOpts":[],"actAns":""}]},{"title":"התיעוד בעת הגבלה ובידוד ","desc":"יחידה זו עוסקת בעקרונות התיעוד הסיעודי בעת הגבלה מכאנית ובידוד, תוך הדגשת האחריות המקצועית, תדירות המעקב, ותוכן הדיווח הנדרש. היחידה מדגישה כי התיעוד מהווה מסמך קליני-משפטי המחייב דיוק, רצף כרונולוגי ותיעוד מלא של הסכנה, ההתערבויות והמעקב עד לסיום ההגבלה או הבידוד.","subUnits":[{"title":"איפה ומתי מתעדים?","type":"flashcards","content":"חובת הרישום הכפול | התיעוד חייב להתבצע במקביל בשני מקומות: 1. הרשומה הממוחשבת. 2. פנקס ההגבלות הידני. אי רישום באחד מהם הוא ליקוי חמור.\nתדירות מעקב - הגבלה מכנית | בדיקה ותיעוד לפחות אחת לחצי שעה.\nתדירות מעקב - בידוד | בדיקה ותיעוד לפחות אחת לשעה.\nמה בודקים בכל פעם? | ערנות, שיתוף פעולה, הצורך בהמשך ההגבלה ומצב הגפיים (צבע, תנועתיות, שלמות העור).","actType":"tf","actQ":"מכיוון שהכל מתועד במחשב, אין חובה למלא גם את פנקס ההגבלות הידני במידה והמשמרת עמוסה","actData":"","actOpts":[],"actAns":"false"},{"title":"מה חייב להופיע בסיפור המקרה?","type":"text","content":"הדיווח חייב להיות מפורט וכרונולוגי ולכלול:\n-נסיבות האירוע: תיאור ההתנהגות שהובילה להגבלה (חובת הוכחת סכנה ממשית ומיידית).\n-ניסיונות קודמים: פירוט ניסיונות הרגעה מילוליים (דה-אסקלציה) לפני ההגבלה.\n-הסבר למטופל: תיעוד מתן הסבר על סיבת ההגבלה.\n-יידוע גורמים: עדכון משפחה או אפוטרופוס לפי הנוהל.\n-מענה לצרכים: תיעוד מתן שתייה, מזון, שירותים ושינוי תנוחה.\n-דיווח לרופא: תיעוד כל שינוי ושעת עדכון הרופא.","actType":"mcq","actQ":"מהם מרכיבי החובה שיש לתעד בכל בדיקה תקופתית (כל חצי שעה) של מטופל הנמצא בהגבלה מכאנית?","actData":"","actOpts":["רמת ערנות והכרה, מידת שיתוף פעולה, מצב הגפיים (צבע, בצקת, שלמות עור) ובחינת הצורך בהמשך ההגבלה.","רשימת האוכל שהמטופל אכל בבוקר ושמות אנשי הצוות שנמצאים במשמרת בלבד.","תיעוד כללי שהמטופל \"שקט\" ללא צורך בבדיקה פיזית של הגפיים.","שעת תחילת ההגבלה בלבד, ללא צורך בתיעוד חוזר עד לסיום ההגבלה"],"actAns":""}]},{"title":"תיעוד השגחה, הסתכלות ושמירה מיוחדת","desc":"רמות ההשגחה השונות נועדו להבטיח את בטיחות המטופל וסביבתו. התיעוד הוא ההוכחה היחידה לכך שהמטופל אכן נמצא תחת פיקוח כנדרש בנוהל. \"מה שלא תועד – כאילו לא הושגח\".","subUnits":[{"title":"מתי וכמה מתעדים?","type":"flashcards","content":"שמירה מיוחדת | תיעוד אחת לשעה. בדיקת רופא לפחות כל 8 שעות. מעקב כללי אחר מצב והתנהגות.\nהסתכלות מיוחדת | תיעוד אחת לחצי שעה. האחות יודעת בכל עת היכן המטופל. מבוצעת על ידי אחות.\nהשגחה מיוחדת | תיעוד אחת לחצי שעה. השגחה צמודה ורציפה (1:1). בדיקת רופא לפחות כל 8 שעות.","actType":"mcq","actQ":"כעובד חדש המבצע תיעוד של מטופל ב\"הסתכלות מיוחדת\", מהו הדגש המרכזי שחייב להופיע בדיווח שלך בכל חצי שעה?","actData":"","actOpts":["מיקום המטופל המדויק בכל עת, מצבו הנפשי, תוכן הדיבור ובחינת מסוכנות.","תיעוד כללי של \"המטופל שקט\" מבלי לציין את מיקומו הפיזי במחלקה","העתקה של הדיווח הקודם במידה ולא חל שינוי משמעותי בהתנהגות המטופל.","בדיקת סימנים חיוניים (דופק ולחץ דם) בלבד ללא התייחסות למצב הנפשי."],"actAns":""},{"title":"נוסחת הרישום המומלצת","type":"steps","content":"שעה: זמן הדיווח המדויק.\nמיקום: איפה המטופל נמצא כרגע פיזית?\nמצב נפשי: מהו הסטטוס הרגשי הנראה לעין?\nהתנהגות: מה המטופל עושה ברגע זה?\nתוכן דיבור: מה נאמר בשיחה (אם התקיימה)?\nהתערבות: מה עשיתם עבורו (שיחה, טיפול, הרגעה)?\nתגובה: איך המטופל הגיב להתערבות שלכם?","actType":"reflect","actQ":"דוגמה לדיווח מקצועי:  \"22:00 – בחדר. אי שקט קל. מדווח על מחשבות רדיפה. בוצעה שיחה מרגיעה. נרגע.\"  תכתוב דוגמה נוספת","actData":"","actOpts":[],"actAns":""},{"title":"\"אל תעשו\" – טעויות נפוצות של עובדים חדשים","type":"flashcards","content":"העתקת תיעוד קודם | הסכנה: יצירת מצג שווא של מעקב. אם המטופל נפל או ברח, והתיעוד שלכם הוא \"העתק-הדבק\" משעה קודמת, אתם בבעיה משפטית ובטיחותית חמורה.\nאי ציון מיקום המטופל | הסכנה: המיקום הוא לב הדיווח בהשגחה/הסתכלות. אם לא ציינתם מיקום, לא באמת הוכחתם שידעתם איפה המטופל נמצא.\nאי עמידה בתדירות הנדרשת | הסכנה: \"חור\" של שעה בתיעוד (כשנדרש חצי שעה) נחשב להפקרת השגחה בבית המשפט ובביקורות משרד הבריאות.","actType":"mcq","actQ":"לפניך דיווח של עובד חדש: \"08:00 – המטופל שקט, ללא מחשבות אובדניות, שיתף פעולה עם חלוקת תרופות\". מהי הטעות הקריטית בדיווח זה?","actData":"","actOpts":["לא צוין מיקום המטופל (איפה הוא נמצא בזמן הדיווח?).","הדיווח קצר מדי.","לא צוין מה המטופל אכל בבוקר.","לא צוין לחץ דם."],"actAns":""}]},{"title":"אירוע חריג ו\"כמעט אירוע\"","desc":"בבריאות הנפש, היכולת שלנו לזהות תקלה לפני שהיא הופכת לנזק היא קריטית. ההבדל בין השניים הוא לא בטעות עצמה, אלא בתוצאה שלה.","subUnits":[{"title":"הגדרות היסוד","type":"flashcards","content":"אירוע חריג | כשל בנהלים או בהתנהלות שבו נגרם נזק בפועל (גופני, נפשי או לרכוש) למטופל או לצוות.\nכמעט אירוע (Near Miss) | טעות או חריגה מנהלים שהייתה עלולה לגרום לנזק, אך הנזק נמנע ברגע האחרון בזכות ערנות או בקרה.\nלמה מדווחים על \"כמעט אירוע\"? | כי זו הזדמנות ללמוד על כשל במערכת ולתקן אותו לפני שמישהו ייפגע בפעם הבאה.","actType":"tf","actQ":"דיווח על 'כמעט אירוע' (Near Miss) הוא פחות חשוב מדיווח על 'אירוע חריג', מכיוון שבסופו של דבר לא נגרם נזק בפועל למטופל או לצוות","actData":"","actOpts":[],"actAns":"false"},{"title":"אירוע חריג (התוצאה: נזק בפועל)","type":"text","content":"\nהגדרה: אירוע שבו הכשל המערכתי או האנושי לא נעצר, והוביל לנזק גופני, נפשי או רכושי.\n\nדוגמאות מהשטח:\nבתחום התרופות: מטופל קיבל בטעות תרופה שאינה שלו. התוצאה: צניחת לחץ דם וצורך בטיפול דחוף.\n\nבתחום הבטיחות: דלת המחלקה נשארה פתוחה עקב תקלה. התוצאה: המטופל יצא מהמחלקה ללא אישור והסתובב לבדו בחוץ.\n\nבתחום האלימות: המטופל מצא בורג משוחרר במיטתו. התוצאה: פצע את עצמו בזרוע ונזקק לתפרים.\n\nבתחום הזיהוי: בוצעה דקירה ולקיחת דם למטופל הלא נכון. התוצאה: דגימה שגויה נשלחה למעבדה (סיכון לטיפול שגוי).","actType":"tf","actQ":"במהלך חלוקת תרופות, אחות הבחינה כי הכינה מזרק עם מינון כפול מהנדרש עבור מטופל. היא עצרה את הפעולה, רוקנה את המזרק והכינה מינון חדש ותקין טרם ההזרקה למטופל. האם מקרה זה יוגדר כ\"אירוע חריג\"?","actData":"","actOpts":[],"actAns":"false"},{"title":"כמעט אירוע (התוצאה: נמנע נזק)","type":"text","content":"\nהגדרה: אירוע שבו אירעה טעות, אך היא נעצרה בזמן (\"ברגע האחרון\") בזכות ערנות, בדיקה כפולה או מזל.\n\nדוגמאות מהשטח:\nבתחום התרופות: האחות הכינה תרופה למטופל הלא נכון, אך בבדיקת הפרטים המזהים ליד המיטה גילתה את הטעות והחליפה את התרופה.\n\nבתחום הבטיחות: איש צוות הרגיש שהדלת לא ננעלת. הוא לא עזב את המקום ודיווח מיד לתיקון – המטופלים נשארו מוגנים.\n\nבתחום האלימות: במהלך סיבוב בוקר שגרתי, האחות זיהתה בורג בולט במיטה. הבורג הוסר והמיטה תוקנה לפני שהמטופל נפגע.\n\nבתחום הזיהוי: האחות ביקשה תעודת זהות לפני דקירת המטופל. היא גילתה שהשם על המבחנה שונה וצירפה מבחנה חדשה לפני הביצוע.","actType":"reflect","actQ":"לפניך משפט, השלם אותו לפי הבנתך:  \"ההבדל בין אירוע חריג לבין כמעט אירוע הוא לא עצם הטעות שקרתה, אלא ה________","actData":"","actOpts":[],"actAns":""}]},{"title":"סימני פיסוק – הדיוק שמאחורי המילים","desc":"בדיווח סיעודי, סימן פיסוק קטן יכול לשנות משמעות של משפט שלם. פיסוק נכון מונע אי-הבנות, מקל על רצף הקריאה ומשקף סדר וחשיבה קלינית מובנית.","subUnits":[{"title":"מדריך סימני הפיסוק בדיווח","type":"flashcards","content":"נקודה (.) | המטרה: סיום מחשבה שלמה. בדיווח קליני נעדיף משפטים קצרים ועובדתיים. משפטים ארוכים מדי עלולים לבלבל.\nפסיק (,) | המטרה: הפרדה בתוך המשפט. משמש לפני מילות קישור (אך, אבל, ולכן), ברשימת תסמינים, או לאחר ביטוי פתיחה.\nנקודתיים (:) | המטרה: הצגת פירוט או ציטוט. לדוגמה: \"נצפו התסמינים הבאים: רעד והזעה\" או \"המטופל אמר: ...\".\nמירכאות (\" \") | המטרה: ציטוט מדויק של דברי המטופל. יש לרשום את הדברים כלשונם ללא תיקון לשוני. למשל: המטופל אמר: \"אני שומע קולות\".\nסוגריים ( ) | המטרה: הוספת מידע משלים שאינו עיקר המשפט, כמו מינון תרופה (2 מ\"ג) או נתון מדיד (לחץ דם).","actType":"tf","actQ":"יש להשתמש בפסיק (,) לפני מילות קישור כמו \"אך\", \"אבל\" ו\"למרות זאת\".","actData":"","actOpts":[],"actAns":"true"},{"title":"כוחם  של  סימני  פיסוק","type":"text","content":"כוחה של הנקודה: מניעת עומס ובלבול\nכאשר אין נקודות, האירועים נראים כמו רצף אחד מלחיץ שקשה להבין בו מה גרם למה.\nהניסוח הבעייתי (ללא נקודות):\n\"המטופל נכנס לחדר האוכל והתחיל לצעוק על איש צוות ואיים שיכה אותו ואז יצא לחצר ונרגע לאחר שיחה קצרה וסירב לקחת טיפול SOS שהוצע לו\"\nהניסוח המקצועי (עם נקודות):\n\"המטופל נכנס לחדר האוכל והחל לצעוק על איש צוות תוך איומים באלימות פיזית. לאחר מכן יצא לחצר. בשיחה קצרה נרגע, אך סירב ליטול טיפול SOS שהוצע לו.\"\nלמה זה חשוב? הנקודות מפרידות בין האירוע האלים לבין התגובה לטיפול. זה מאפשר לזהות בקלות שהמטופל נרגע מילולית אך עדיין לא מאוזן תרופתית.\n\n2. כוחן של המירכאות: דיוק מול פרשנות\nבבריאות הנפש, יש הבדל עצום בין מה שהאחות חושבת לבין מה שהמטופל אומר.\nהניסוח הבעייתי (פרשנות):\nהמטופל חושב שכולם נגדו ורוצים להרע לו במחלקה ולכן הוא מפחד.\nהניסוח המקצועי (ציטוט במירכאות):\nהמטופל מביע חשדנות כלפי הצוות. אמר: \"אני יודע ששמתם לי רעל באוכל, אתם רוצים לגמור אותי\".\nלמה זה חשוב? המירכאות מוכיחות שהמטופל סובל ממחשבות שווא (דלוזיות) קונקרטיות. הניסוח הראשון הוא רק התרשמות, הניסוח השני הוא עובדה קלינית מוצקה.\n\n3. כוחם של הנקודתיים והפסיק: סדר ברשימת תסמינים\nכשמדובר בבטיחות, אנחנו רוצים רשימה מסודרת ולא \"סלט\" של מילים.\nהניסוח הבעייתי:\nלמטופל יש רעד בידיים והוא מזיע ויש לו דופק מהיר והוא אומר שהוא מרגיש חנוק.\nהניסוח המקצועי:\nנצפו תסמינים גופניים חריגים: רעד בידיים, הזעה מוגברת ודופק מהיר. בנוסף, המטופל מדווח: \"אני מרגיש חנק\".\nלמה זה חשוב? שימוש בנקודתיים (:) יוצר הכנה לרשימה, והפסיקים מפרידים בין הממצאים. כך הרופא יכול לסרוק את הדיווח ב-2 שניות ולהבין שיש כאן אירוע רפואי (אולי התקף חרדה או תופעת לוואי).","actType":"tf","actQ":"כאשר מצטטים את דברי המטופל (למשל: \"אני שומע קולות\"), יש להשתמש במירכאות ולרשום את הדברים בדיוק כפי שנאמרו.","actData":"","actOpts":[],"actAns":"true"}]}],"exam":[{"text":"מהי המשמעות המרכזית של הרשומה הסיעודית?","opts":["מסמך קליני ומשפטי מחייב","מסמך פנימי להעברת מידע בלבד","כלי אדמיניסטרטיבי לניהול משמרת","סיכום יומי לצרכי הנהלה"]},{"text":"על פי חוק זכויות החולה (סעיף 17), חובה לתעד","opts":["מהלך טיפול, אבחנות, הוראות, התערבויות ומצב קליני","רק מתן תרופות","רק אבחנה רפואית","רק תלונות המטופל"]},{"text":"מה קובע עקרון \"מה שלא תועד – לא בוצע\"?","opts":["פעולה שלא תועדה תיחשב כאילו לא בוצעה","ניתן להשלים תיעוד בדיעבד ללא ציון","תיעוד הוא בגדר המלצה בלבד","אין חשיבות לסדר כרונולוגי"]},{"text":"איזה מהבאים מהווה תיעוד אובייקטיבי תקין?","opts":["המטופל צעק והכה בדלת החדר","המטופל אלים מאוד","המטופל מניפולטיבי","המטופל בעייתי"]},{"text":"מודל SOAP מתאים במיוחד ל:","opts":["הערכה ראשונית וסיכום מצב מורכב","תיעוד אירוע תרופתי קצר","רישום חפצי ערך","תיעוד השגחה מיוחדת"]},{"text":"בדיווח שחרור חובה לציין:","opts":["מצב המטופל, הדרכה, תרופות, מסמכים וחפצי ערך","רק חתימת רופא","רק תרופות","רק מצב נפשי"]},{"text":"בעת קבלת מטופל למלר״ד יש לתעד במפורש:","opts":["אומדן מסוכנות","רק תלונת המטופל","רק מדדים חיוניים","רק מקור הפניה"]},{"text":"בתיעוד חפצי ערך נכון לכתוב:","opts":["ארנק שחור, 230 ₪, תעודת זהות, טלפון Samsung כחול","נלקחו חפצים","הופקד רכוש","ציוד אישי"]},{"text":"בהסתכלות מיוחדת יש לתעד:","opts":["אחת לחצי שעה","אחת לשעתיים","פעם במשמרת","רק אם יש שינוי"]},{"text":"מתי משתמשים בנקודתיים (:) בדיווח?","opts":["לפני פירוט או רשימה","בסיום כל משפט","לפני כל מילה חשובה","במקום פסיק"]}]};
+
+    let state = {
+      screen: 'intro', // intro, unit, exam, examResult, outro
+      unitIdx: 0,
+      subIdx: 0,
+      answers: [],
+      examScores: [],
+      completedActivities: new Set()
+    };
+
+    const themes = [
+      { accent: '#4f46e5', accent2: '#818cf8', soft: '#eef2ff', cardBg: '#ffffff', cardBorder: '#e2e8f0' },
+      { accent: '#ea580c', accent2: '#fb923c', soft: '#ffedd5', cardBg: '#fff7ed', cardBorder: '#fed7aa' },
+      { accent: '#16a34a', accent2: '#4ade80', soft: '#dcfce7', cardBg: '#f0fdf4', cardBorder: '#bbf7d0' },
+      { accent: '#db2777', accent2: '#f472b6', soft: '#fce7f3', cardBg: '#fdf2f8', cardBorder: '#fbcfe8' },
+      { accent: '#0284c7', accent2: '#38bdf8', soft: '#e0f2fe', cardBg: '#f0f9ff', cardBorder: '#bae6fd' },
+    ];
+
+    const unitIcons = [
+      // Simple inline SVG icons (no external libraries)
+      `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3a5 5 0 0 1 9 3c0 6.5-8 11-8 11z"/></svg>`,
+      `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20"/><path d="M6.5 2H20v20"/><path d="M6.5 2A2.5 2.5 0 0 0 4 4.5v15"/></svg>`,
+      `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M12 4h9"/><path d="M4 9h16"/><path d="M4 15h16"/></svg>`,
+      `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M12 3v18"/><path d="M7 7h10v10H7z"/></svg>`,
+      `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 6.5L21 9l-5 4 1.5 7-5.5-3.5L6.5 20 8 13 3 9l6.5-.5L12 2z"/></svg>`
+    ];
+
+    function applyThemeByUnit(unitIdx) {
+      const t = themes[unitIdx % themes.length];
+      document.documentElement.style.setProperty('--accent', t.accent);
+      document.documentElement.style.setProperty('--accent2', t.accent2);
+      document.documentElement.style.setProperty('--soft', t.soft);
+      document.documentElement.style.setProperty('--card-bg', t.cardBg);
+      document.documentElement.style.setProperty('--card-border', t.cardBorder);
+    }
+
+    function renderSidebar() {
+      const el = document.getElementById('sidebarList');
+      if (!el) return;
+
+      el.innerHTML = moduleData.units.map((u, idx) => {
+        const icon = unitIcons[idx % unitIcons.length];
+        return `
+          <button class="side-item w-full text-right" data-unit="${idx}" onclick="jumpToUnit(${idx})">
+            <div class="side-icon">${icon}</div>
+            <div class="min-w-0 flex-1">
+              <div class="side-title truncate">${u.title}</div>
+              <div class="side-sub">${u.subUnits.length} תתי-נושאים</div>
+            </div>
+            <div class="accent-pill opacity-0" data-dot="${idx}"></div>
+          </button>
+        `;
+      }).join('');
+      updateSidebarActive();
+    }
+
+    function updateSidebarActive() {
+      const items = document.querySelectorAll('[data-unit]');
+      items.forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('[data-dot]').forEach(d => d.classList.add('opacity-0'));
+
+      if (state.screen === 'unit') {
+        const active = document.querySelector(`[data-unit="${state.unitIdx}"]`);
+        const dot = document.querySelector(`[data-dot="${state.unitIdx}"]`);
+        if (active) active.classList.add('active');
+        if (dot) dot.classList.remove('opacity-0');
+      }
+    }
+
+    function jumpToUnit(idx) {
+      state.screen = 'unit';
+      state.unitIdx = idx;
+      state.subIdx = 0;
+      window.scrollTo(0,0);
+      render();
+    }
+
+    function updateProgressUI(progress01) {
+      const pct = Math.round(progress01 * 100);
+      document.getElementById('progressBar').style.width = pct + '%';
+      document.getElementById('progressPct').textContent = pct + '%';
+      // SVG circle uses dasharray in percentage units (0..100)
+      document.getElementById('progressCircle').setAttribute('stroke-dasharray', `${pct} 100`);
+    }
+
+    function render() {
+      // Theme based on current unit (or first theme on intro/outro)
+      const themeIdx = (state.screen === 'unit') ? state.unitIdx : 0;
+      applyThemeByUnit(themeIdx);
+
+      const app = document.getElementById('app');
+      const progress01 = calculateProgress();
+      updateProgressUI(progress01);
+      updateSidebarActive();
+
+      if (state.screen === 'intro') {
+        app.innerHTML = `
+          <div class="module-card p-8 md:p-12 text-center space-y-8">
+            <div class="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6" style="background: var(--soft); border: 1px solid rgba(0,0,0,0.04);">
+              <svg class="w-12 h-12" style="color: var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.246 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+            </div>
+            <h1 class="text-4xl font-black text-slate-900">${moduleData.intro.title}</h1>
+            <p class="text-xl text-slate-600 leading-relaxed whitespace-pre-wrap">${moduleData.intro.text}</p>
+            <button onclick="nextStep()" class="btn-primary w-full md:w-auto px-12 py-4 text-white text-xl font-bold rounded-2xl shadow-xl transition-all hover:-translate-y-1">${moduleData.intro.btn}</button>
+          </div>`;
+      } else if (state.screen === 'unit') {
+        const unit = moduleData.units[state.unitIdx];
+        const sub = unit.subUnits[state.subIdx];
+        app.innerHTML = `
+          <div class="space-y-6">
+            <div class="flex justify-between items-center text-sm font-bold text-slate-400">
+              <span>יחידה ${state.unitIdx + 1}: ${unit.title}</span>
+              <span>${state.subIdx + 1} / ${unit.subUnits.length}</span>
+            </div>
+
+            <div class="module-card p-8 md:p-10 space-y-8">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-2xl grid place-items-center" style="background: var(--soft); border: 1px solid rgba(0,0,0,0.04);">
+                  ${unitIcons[state.unitIdx % unitIcons.length]}
+                </div>
+                <div class="min-w-0">
+                  <h2 class="text-3xl font-black text-slate-900">${sub.title}</h2>
+                  <div class="mt-1 text-sm font-bold" style="color: var(--accent);">${unit.desc}</div>
+                </div>
+              </div>
+
+              <div class="content-view text-lg leading-relaxed text-slate-700">
+                ${renderContent(sub)}
+              </div>
+
+              <div class="activity-section p-6 rounded-2xl border" style="background: rgba(255,255,255,0.6); border-color: var(--card-border);">
+                <h3 class="text-sm font-black uppercase tracking-widest mb-4" style="color: var(--accent);">בדיקת הבנה</h3>
+                ${renderActivity(sub, `${state.unitIdx}-${state.subIdx}`)}
+              </div>
+
+              <div class="flex gap-4">
+                <button onclick="prevStep()" class="flex-1 py-4 border-2 border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all">הקודם</button>
+                <button id="nextBtn" onclick="nextStep()" class="flex-[2] py-4 rounded-xl font-bold shadow-lg text-white btn-primary transition-all">המשך</button>
+              </div>
+            </div>
+          </div>`;
+      } else if (state.screen === 'exam') {
+        app.innerHTML = `
+          <div class="module-card p-8 md:p-12 space-y-8">
+            <div class="text-center">
+              <h2 class="text-3xl font-black">מבחן מסכם</h2>
+              <p class="text-slate-500">בואו נראה מה למדנו...</p>
+            </div>
+
+            <div class="space-y-12">
+              ${moduleData.exam.map((q, i) => `
+                <div class="space-y-4">
+                  <p class="font-bold text-lg">${i+1}. ${q.text}</p>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${shuffle(q.opts.map((o, oi) => `
+                      <button onclick="setExamAnswer(${i}, ${oi === 0}, this)" class="exam-q-${i} text-right p-4 border-2 border-slate-100 rounded-xl transition-all hover:translate-y-[-1px]" style="background: white;">
+                        ${o}
+                      </button>
+                    `)).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <button onclick="finishExam()" class="w-full py-5 text-white text-xl font-black rounded-2xl shadow-xl btn-primary">סיים מבחן</button>
+          </div>`;
+      } else if (state.screen === 'examResult') {
+        const score = calculateScore();
+        const passed = score >= 70;
+        app.innerHTML = `
+          <div class="module-card p-12 text-center space-y-8">
+            <div class="text-7xl mb-4">${passed ? '🎉' : '😕'}</div>
+            <h2 class="text-4xl font-black">${passed ? 'כל הכבוד!' : 'לא נורא, ננסה שוב'}</h2>
+            <div class="text-6xl font-black" style="color: var(--accent);">${score}%</div>
+            <p class="text-xl text-slate-500">${passed ? 'עברת את המבחן בהצלחה.' : 'כדאי לחזור על החומר ולנסות שוב.'}</p>
+            <div class="flex flex-col gap-4">
+              ${!passed ? `<button onclick="state.screen='unit'; state.unitIdx=0; state.subIdx=0; render()" class="py-4 bg-slate-900 text-white rounded-2xl font-bold">חזרה ללמידה</button>` : ''}
+              <button onclick="nextStep()" class="py-4 text-white rounded-2xl font-bold btn-primary">המשך לסיום</button>
+            </div>
+          </div>`;
+      } else if (state.screen === 'outro') {
+        app.innerHTML = `
+          <div class="module-card p-12 text-center space-y-8">
+            <h1 class="text-4xl font-black text-slate-900">${moduleData.outro.title}</h1>
+            <p class="text-xl text-slate-600 leading-relaxed whitespace-pre-wrap">${moduleData.outro.text}</p>
+            <button onclick="window.location.reload()" class="w-full md:w-auto px-12 py-4 text-white text-xl font-bold rounded-2xl shadow-xl btn-primary">${moduleData.outro.btn}</button>
+          </div>`;
+      }
+    }
+
+    function renderContent(sub) {
+      if (sub.type === 'text') return `<p class="whitespace-pre-wrap">${sub.content}</p>`;
+      if (sub.type === 'list') {
+        return `<ul class="space-y-4">${sub.content.split('\n').map(item => `
+          <li class="flex items-start gap-3">
+            <span class="w-2 h-2 mt-2 rounded-full shrink-0" style="background: var(--accent);"></span>
+            <span>${item}</span>
+          </li>
+        `).join('')}</ul>`;
+      }
+      if (sub.type === 'flashcards') {
+        return `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${sub.content.split('\n').map(line => {
+          const [front, back] = line.split('|');
+          return `<div class="flashcard" onclick="this.classList.toggle('flipped')">
+            <div class="flashcard-inner">
+              <div class="flashcard-front">${front || ''}</div>
+              <div class="flashcard-back">${back || ''}</div>
+            </div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+      if (sub.type === 'steps') {
+        return `<div class="space-y-8">${sub.content.split('\n').map((line, i) => {
+          const [title, desc] = line.split('|');
+          return `<div class="flex gap-6">
+            <div class="shrink-0"><div class="step-bubble">${i+1}</div></div>
+            <div>
+              <h4 class="font-bold text-xl mb-1">${title || ''}</h4>
+              <p class="text-slate-500">${desc || ''}</p>
+            </div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+      return '';
+    }
+
+    function renderActivity(sub, id) {
+      if (sub.actType === 'mcq') {
+        return `<div class="space-y-4">
+          <p class="font-bold">${sub.actQ}</p>
+          <div class="grid grid-cols-1 gap-2">
+            ${shuffle(sub.actOpts.map((o, i) => `
+              <button onclick="checkActivityAns(this, ${i === 0}, '${id}')" class="option-btn p-4 text-right rounded-xl">${o}</button>
+            `)).join('')}
+          </div>
+        </div>`;
+      }
+      if (sub.actType === 'tf') {
+        return `<div class="space-y-4">
+          <p class="font-bold">${sub.actQ}</p>
+          <div class="grid grid-cols-2 gap-4">
+            <button onclick="checkActivityAns(this, ${sub.actAns==='true'}, '${id}')" class="option-btn p-4 rounded-xl font-bold">נכון</button>
+            <button onclick="checkActivityAns(this, ${sub.actAns==='false'}, '${id}')" class="option-btn p-4 rounded-xl font-bold">לא נכון</button>
+          </div>
+        </div>`;
+      }
+      if (sub.actType === 'reflect') {
+        return `<div class="space-y-4">
+          <p class="font-bold">${sub.actQ}</p>
+          <textarea oninput="state.completedActivities.add('${id}')" class="w-full p-4 border rounded-xl" placeholder="כתבו כאן את מחשבותיכם..."></textarea>
+        </div>`;
+      }
+      return '<p class="text-slate-400">עברו על התוכן והמשיכו הלאה.</p>';
+    }
+
+    function checkActivityAns(btn, isCorrect, id) {
+      const container = btn.parentElement;
+      container.querySelectorAll('button').forEach(b => b.classList.remove('correct', 'wrong'));
+      if (isCorrect) {
+        btn.classList.add('correct');
+        state.completedActivities.add(id);
+      } else {
+        btn.classList.add('wrong');
+      }
+    }
+
+    function setExamAnswer(qIdx, isCorrect, btn) {
+      state.examScores[qIdx] = isCorrect;
+      document.querySelectorAll('.exam-q-' + qIdx).forEach(b => {
+        b.classList.remove('text-white');
+        b.style.background = 'white';
+        b.style.borderColor = '#e2e8f0';
+      });
+      btn.classList.add('text-white');
+      btn.style.background = 'var(--accent)';
+      btn.style.borderColor = 'transparent';
+    }
+
+    function calculateScore() {
+      const correct = state.examScores.filter(s => s === true).length;
+      return Math.round((correct / moduleData.exam.length) * 100);
+    }
+
+    function finishExam() {
+      if (state.examScores.filter(x => x !== undefined).length < moduleData.exam.length) {
+        alert('יש לענות על כל השאלות לפני סיום המבחן');
+        return;
+      }
+      state.screen = 'examResult';
+      render();
+    }
+
+    function nextStep() {
+      if (state.screen === 'intro') {
+        state.screen = 'unit';
+      } else if (state.screen === 'unit') {
+        const unit = moduleData.units[state.unitIdx];
+        if (state.subIdx < unit.subUnits.length - 1) {
+          state.subIdx++;
+        } else if (state.unitIdx < moduleData.units.length - 1) {
+          state.unitIdx++;
+          state.subIdx = 0;
+        } else {
+          state.screen = moduleData.exam.length > 0 ? 'exam' : 'outro';
+        }
+      } else if (state.screen === 'examResult') {
+        state.screen = 'outro';
+      }
+      window.scrollTo(0,0);
+      render();
+    }
+
+    function prevStep() {
+      if (state.screen === 'unit') {
+        if (state.subIdx > 0) {
+          state.subIdx--;
+        } else if (state.unitIdx > 0) {
+          state.unitIdx--;
+          state.subIdx = moduleData.units[state.unitIdx].subUnits.length - 1;
+        } else {
+          state.screen = 'intro';
+        }
+      }
+      window.scrollTo(0,0);
+      render();
+    }
+
+    function calculateProgress() {
+      if (state.screen === 'intro') return 0;
+      if (state.screen === 'outro') return 1;
+      const totalUnits = moduleData.units.length;
+      if (state.screen === 'exam' || state.screen === 'examResult') return 0.92;
+      const currentPos = state.unitIdx + (state.subIdx / moduleData.units[state.unitIdx].subUnits.length);
+      return (currentPos / totalUnits) * 0.9;
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    renderSidebar();
+    render();
+  </script>
+</body>
+</html>
